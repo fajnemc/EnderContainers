@@ -36,16 +36,21 @@ public class NMSPlayerUtil extends NMSUtil {
 
     private Object playerInteractManager;
 
+    private Object defaultClientInformation;
+
     /**
      * Constructs the utility class.
      *
      * @throws ReflectiveOperationException thrown if cannot instanciate NMS objects
      */
     private NMSPlayerUtil() throws ReflectiveOperationException {
-        Class<?> entityPlayerClass = getNMSClass("EntityPlayer", "server.level");
+        // 1.20.5+ :: server uses mojang-mapped class names
+        boolean mojangMapped = ServerVersion.is(ServerVersion.NEWER);
+
+        Class<?> entityPlayerClass = getNMSClass(mojangMapped ? "ServerPlayer" : "EntityPlayer", "server.level");
         Class<?> minecraftServerClass = getNMSClass("MinecraftServer", "server");
         Class<?> gameProfileClass = Class.forName("com.mojang.authlib.GameProfile");
-        Class<?> worldServerClass = getNMSClass("WorldServer", "server.level");
+        Class<?> worldServerClass = getNMSClass(mojangMapped ? "ServerLevel" : "WorldServer", "server.level");
 
         // 1.18+ :: New method names
         methodGetWorldServer = ServerVersion.isNewerThan(ServerVersion.V1_17) ? "a" : "getWorldServer";
@@ -53,6 +58,19 @@ public class NMSPlayerUtil extends NMSUtil {
         gameProfileContructor = gameProfileClass.getDeclaredConstructor(UUID.class, String.class);
         minecraftServer = minecraftServerClass.getMethod("getServer").invoke(null);
         getBukkitEntityMethod = entityPlayerClass.getDeclaredMethod("getBukkitEntity");
+
+        if (mojangMapped) {
+            // 1.20.5+ :: mojang-mapped names, constructor needs client information
+            worldServer = minecraftServerClass.getMethod("overworld").invoke(minecraftServer);
+
+            Class<?> clientInformationClass = getNMSClass("ClientInformation", "server.level");
+            defaultClientInformation = clientInformationClass.getMethod("createDefault").invoke(null);
+            entityPlayerConstructor = entityPlayerClass.getDeclaredConstructor(
+                    minecraftServerClass, worldServerClass, gameProfileClass, clientInformationClass
+            );
+            return;
+        }
+
         worldServer = this.prepareWorldServer(minecraftServerClass);
 
         if (ServerVersion.isNewerThan(ServerVersion.V1_18)) {
@@ -106,8 +124,13 @@ public class NMSPlayerUtil extends NMSUtil {
         Object gameProfile = gameProfileContructor.newInstance(offline.getUniqueId(), offline.getName());
         Object entityPlayer;
 
-        // 1.17+ :: we do not have to pass PlayerInteractManager to entity player constructor
-        if (playerInteractManager == null) {
+        // 1.20.5+ :: mojang-mapped constructor needs client information
+        if (defaultClientInformation != null) {
+            entityPlayer = entityPlayerConstructor.newInstance(
+                    minecraftServer, worldServer, gameProfile, defaultClientInformation
+            );
+        } else if (playerInteractManager == null) {
+            // 1.17+ :: we do not have to pass PlayerInteractManager to entity player constructor
             // 1.19+ :: constructor also need a public key
             if (ServerVersion.isNewerThan(ServerVersion.V1_18)) {
                 entityPlayer = entityPlayerConstructor.newInstance(minecraftServer, worldServer, gameProfile, null);

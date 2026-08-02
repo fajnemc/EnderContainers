@@ -39,7 +39,10 @@ public abstract class NMSUtil {
         // Using remapped source code of Minecraft server? 1.17+
         MC_PACKAGE = ServerVersion.isNewerThan(ServerVersion.V1_16) ? "net.minecraft." : null;
         NMS_PACKAGE = "net.minecraft.server." + version + ".";
-        CRAFTBUKKIT_PACKAGE = "org.bukkit.craftbukkit." + version + ".";
+        // starting from 1.20.5, version is no more in package name
+        CRAFTBUKKIT_PACKAGE = "craftbukkit".equals(version)
+                ? "org.bukkit.craftbukkit."
+                : "org.bukkit.craftbukkit." + version + ".";
 
         try {
             Class<?> asyncCatcher = Class.forName("org.spigotmc.AsyncCatcher");

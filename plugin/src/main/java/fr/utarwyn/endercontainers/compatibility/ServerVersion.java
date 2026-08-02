@@ -46,6 +46,11 @@ public enum ServerVersion {
                     break;
                 }
             }
+
+            // unknown version scheme (e.g. Minecraft 26.2+), assume newer than all known versions
+            if (currentVersion == null) {
+                currentVersion = NEWER;
+            }
         }
     }
 
