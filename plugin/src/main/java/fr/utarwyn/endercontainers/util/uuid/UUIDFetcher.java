@@ -165,17 +165,17 @@ public class UUIDFetcher {
         Player player = Bukkit.getPlayer(uuid);
         if (player != null && player.isOnline()) return player.getName();
 
-        // For an offline server, it's better to use the Bukkit local cache.
+        // Use the Bukkit local cache before any web request.
+        OfflinePlayer offlinePlayer = Bukkit.getOfflinePlayer(uuid);
+        if (offlinePlayer.hasPlayedBefore() && offlinePlayer.getName() != null) {
+            idCache.put(uuid, offlinePlayer.getName());
+            nameCache.put(offlinePlayer.getName(), uuid);
+
+            return offlinePlayer.getName();
+        }
+
+        // For an offline server, do not try to contact the Mojang API.
         if (!Bukkit.getOnlineMode()) {
-            OfflinePlayer offlinePlayer = Bukkit.getOfflinePlayer(uuid);
-
-            if (offlinePlayer.hasPlayedBefore()) {
-                idCache.put(uuid, offlinePlayer.getName());
-                nameCache.put(offlinePlayer.getName(), uuid);
-
-                return offlinePlayer.getName();
-            }
-
             return null;
         }
 
@@ -246,7 +246,7 @@ public class UUIDFetcher {
             }
 
             boolean isExpired() {
-                return value.get() == null || expires != -1 && expires > System.currentTimeMillis();
+                return value.get() == null || expires != -1 && expires < System.currentTimeMillis();
             }
 
         }
